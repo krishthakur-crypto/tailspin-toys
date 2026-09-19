@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, count, eq, inArray } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import type { Database } from './db';
 import { games, categories, publishers } from '../../db/schema';
@@ -29,6 +29,14 @@ type GameSelectionRow = {
 export interface GameFilters {
     categoryIds?: number[];
     publisherId?: number;
+}
+
+export interface GamesPage {
+    games: Game[];
+    page: number;
+    pageSize: number;
+    totalGames: number;
+    totalPages: number;
 }
 
 function mapGame(row: GameSelectionRow): Game {
@@ -68,6 +76,45 @@ function getFilterConditions(filters: GameFilters): SQL[] {
     }
 
     return conditions;
+}
+
+/**
+ * Returns one stable, title-ordered page of games and its pagination metadata.
+ *
+ * @param db - Drizzle database client used to query the games and relations.
+ * @param page - One-based page number. Values below one are treated as page one.
+ * @param pageSize - Number of games to include per page.
+ * @param filters - Optional category and publisher filters applied before paging.
+ * @returns The requested page, total matching game count, and total page count.
+ */
+export async function getGamesPage(
+    db: Database,
+    page: number,
+    pageSize: number,
+    filters: GameFilters = {},
+): Promise<GamesPage> {
+    const normalizedPage = Math.max(1, Math.floor(page));
+    const normalizedPageSize = Math.max(1, Math.floor(pageSize));
+    const conditions = getFilterConditions(filters);
+    const query = baseGamesQuery(db);
+    const filteredQuery = conditions.length > 0 ? query.where(and(...conditions)) : query;
+    const rows = await filteredQuery
+        .orderBy(asc(games.title))
+        .limit(normalizedPageSize)
+        .offset((normalizedPage - 1) * normalizedPageSize);
+    const countQuery = db.select({ total: count() }).from(games);
+    const [{ total }] = await (
+        conditions.length > 0 ? countQuery.where(and(...conditions)) : countQuery
+    );
+    const totalGames = Number(total);
+
+    return {
+        games: rows.map(mapGame),
+        page: normalizedPage,
+        pageSize: normalizedPageSize,
+        totalGames,
+        totalPages: Math.max(1, Math.ceil(totalGames / normalizedPageSize)),
+    };
 }
 
 /**

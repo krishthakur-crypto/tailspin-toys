@@ -5,6 +5,7 @@ import type { Database } from './db';
 import {
     getAllGames,
     getAllGameIds,
+    getGamesPage,
     getGameById,
 } from './games';
 
@@ -70,6 +71,29 @@ describe('games data-access helpers', () => {
         const filtered = await getAllGames(db, { publisherId: ids.otherPublisherId });
 
         expect(filtered.map((game) => game.title)).toEqual(['Game 03']);
+    });
+
+    it('returns a title-ordered page with pagination metadata', async () => {
+        await seedGames(db, 5);
+
+        const firstPage = await getGamesPage(db, 2, 2);
+
+        expect(firstPage.games.map((game) => game.title)).toEqual(['Game 03', 'Game 04']);
+        expect(firstPage.page).toBe(2);
+        expect(firstPage.pageSize).toBe(2);
+        expect(firstPage.totalGames).toBe(5);
+        expect(firstPage.totalPages).toBe(3);
+    });
+
+    it('clamps invalid pagination values to the first page', async () => {
+        await seedGames(db, 2);
+
+        const page = await getGamesPage(db, 0, 0);
+
+        expect(page.games).toHaveLength(1);
+        expect(page.page).toBe(1);
+        expect(page.pageSize).toBe(1);
+        expect(page.totalPages).toBe(2);
     });
 
     it('combines category and publisher filters', async () => {

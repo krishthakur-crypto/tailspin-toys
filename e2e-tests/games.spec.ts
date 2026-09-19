@@ -36,6 +36,21 @@ test.describe('Game Listing and Navigation', () => {
     await expect(page.locator('[data-testid="game-card"]:not([hidden])')).toHaveCount(initialCardCount);
   });
 
+  test('should navigate between paginated game-list pages', async ({ page }) => {
+    await page.goto('/');
+
+    await expect(page.getByTestId('pagination-status')).toHaveText('Page 1 of 2');
+    await expect(page.getByTestId('games-grid').getByTestId('game-card')).toHaveCount(19);
+
+    await page.getByTestId('pagination-next').click();
+
+    await expect(page).toHaveURL('/page/2');
+    await expect(page.getByTestId('pagination-status')).toHaveText('Page 2 of 2');
+    await expect(page.getByTestId('games-grid').getByTestId('game-card')).toHaveCount(2);
+    await expect(page.getByTestId('game-title').first()).toHaveText('Terminal Turbulence');
+    await expect(page.getByTestId('pagination-previous')).toHaveAttribute('href', '/');
+  });
+
   test('should show an empty state when filters have no matches', async ({ page }) => {
     await page.goto('/?category=1&publisher=999');
 
