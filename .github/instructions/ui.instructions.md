@@ -51,6 +51,22 @@ Refer to technology-specific instruction files:
 - Use props for configuration, not duplication
 - Document component APIs with TypeScript types
 
+### Commenting and Documentation Standards
+
+- Comment the decision, constraint, or intent behind code — not the mechanics of the code that is already obvious from reading it.
+- Prefer explaining why a branch exists, why a specific value is chosen, or why a workaround is required.
+- Remove comments that merely restate the line below them or duplicate names already visible in the code.
+- Treat stale comments as bugs: update or delete them with the same change that modifies the related logic.
+- Every reusable `.astro` component should document its `Props` contract, and every exported function in `db/` and `src/lib/` should have JSDoc/TSDoc with parameter and return descriptions.
+
+### TypeScript Formatting and Linting
+
+- Use explicit TypeScript types for props, function parameters, and return values.
+- Prefer named interfaces for object contracts and keep types close to the code that uses them.
+- Keep imports grouped by external vs local modules and use the repository's existing single-quote, semicolon, 2-space style.
+- Match the surrounding code's formatting rather than introducing new patterns in one-off edits.
+- Run `npm run lint` after changes; the project relies on the ESLint defaults and recommended TypeScript rules for stable enforcement, while comment quality remains a documentation standard rather than a brittle comment-lint rule.
+
 ## Development Workflow
 
 1. **Choose the right tool**: 
