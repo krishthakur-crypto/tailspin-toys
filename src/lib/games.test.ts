@@ -8,14 +8,20 @@ import {
     getGameById,
 } from './games';
 
-async function seedGames(db: Database, count: number): Promise<void> {
-    const [category] = await db
+async function seedGames(db: Database, count: number): Promise<{ categoryId: number; otherCategoryId: number; publisherId: number; otherPublisherId: number }> {
+    const [category, otherCategory] = await db
         .insert(categories)
-        .values({ name: 'Strategy', description: 'cat' })
+        .values([
+            { name: 'Strategy', description: 'cat' },
+            { name: 'Puzzle', description: 'other cat' },
+        ])
         .returning({ id: categories.id });
-    const [publisher] = await db
+    const [publisher, otherPublisher] = await db
         .insert(publishers)
-        .values({ name: 'Pub One', description: 'pub' })
+        .values([
+            { name: 'Pub One', description: 'pub' },
+            { name: 'Pub Two', description: 'other pub' },
+        ])
         .returning({ id: publishers.id });
 
     // Insert titles in reverse-alphabetical order to prove ordering is applied.
@@ -24,10 +30,17 @@ async function seedGames(db: Database, count: number): Promise<void> {
             title: `Game ${String(i).padStart(2, '0')}`,
             description: `Description ${i}`,
             starRating: 4.2,
-            categoryId: category.id,
-            publisherId: publisher.id,
+            categoryId: i % 2 === 0 ? otherCategory.id : category.id,
+            publisherId: i === 3 ? otherPublisher.id : publisher.id,
         });
     }
+
+    return {
+        categoryId: category.id,
+        otherCategoryId: otherCategory.id,
+        publisherId: publisher.id,
+        otherPublisherId: otherPublisher.id,
+    };
 }
 
 describe('games data-access helpers', () => {
@@ -43,6 +56,36 @@ describe('games data-access helpers', () => {
         expect(all.map((g) => g.title)).toEqual(['Game 01', 'Game 02', 'Game 03']);
         expect(all[0].category).toEqual({ id: expect.any(Number), name: 'Strategy' });
         expect(all[0].publisher).toEqual({ id: expect.any(Number), name: 'Pub One' });
+    });
+
+    it('filters games by any selected category', async () => {
+        const ids = await seedGames(db, 3);
+        const filtered = await getAllGames(db, { categoryIds: [ids.otherCategoryId] });
+
+        expect(filtered.map((game) => game.title)).toEqual(['Game 02']);
+    });
+
+    it('filters games by publisher', async () => {
+        const ids = await seedGames(db, 3);
+        const filtered = await getAllGames(db, { publisherId: ids.otherPublisherId });
+
+        expect(filtered.map((game) => game.title)).toEqual(['Game 03']);
+    });
+
+    it('combines category and publisher filters', async () => {
+        const ids = await seedGames(db, 3);
+        const filtered = await getAllGames(db, {
+            categoryIds: [ids.categoryId, ids.otherCategoryId],
+            publisherId: ids.publisherId,
+        });
+
+        expect(filtered.map((game) => game.title)).toEqual(['Game 01', 'Game 02']);
+    });
+
+    it('returns an empty list when filters have no matches', async () => {
+        const ids = await seedGames(db, 2);
+
+        await expect(getAllGames(db, { categoryIds: [ids.otherCategoryId], publisherId: ids.otherPublisherId })).resolves.toEqual([]);
     });
 
     it('returns all game ids ordered by title', async () => {
