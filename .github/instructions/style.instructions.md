@@ -40,6 +40,14 @@ ALL UI components MUST use dark theme colors:
 - Mobile-first approach
 - Ensure readability on all screen sizes
 
+## TypeScript Formatting Standards
+
+- Prefer explicit TypeScript types for component props, data-access helper parameters, and function return values.
+- Keep interfaces close to their usage and name them descriptively (`Props`, `GameSelectionRow`, `Database`); use `type` aliases for unions and simple object combinations when that is clearer.
+- Follow the repository's existing formatting style: single quotes, semicolons, 2-space indentation, and grouped imports.
+- Keep helper functions small and readable; prefer destructuring and named return values over over-commented code blocks.
+- Run `npm run lint` after changes. ESLint covers the stable rules for the repo; comment and documentation quality is enforced by repository guidance and code review rather than brittle comment-only lint rules.
+
 ## Utility Classes
 
 - Prefer utility classes over custom CSS when possible
