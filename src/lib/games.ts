@@ -1,4 +1,5 @@
-import { eq, asc } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
+import type { SQL } from 'drizzle-orm';
 import type { Database } from './db';
 import { games, categories, publishers } from '../../db/schema';
 import type { Game } from '../types/game';
@@ -25,6 +26,11 @@ type GameSelectionRow = {
     publisherName: string | null;
 };
 
+export interface GameFilters {
+    categoryIds?: number[];
+    publisherId?: number;
+}
+
 function mapGame(row: GameSelectionRow): Game {
     return {
         id: row.id,
@@ -50,19 +56,53 @@ function baseGamesQuery(db: Database) {
         .leftJoin(publishers, eq(games.publisherId, publishers.id));
 }
 
-/** All games ordered by title. */
-export async function getAllGames(db: Database): Promise<Game[]> {
-    const rows = await baseGamesQuery(db).orderBy(asc(games.title));
+function getFilterConditions(filters: GameFilters): SQL[] {
+    const conditions: SQL[] = [];
+
+    if (filters.categoryIds && filters.categoryIds.length > 0) {
+        conditions.push(inArray(games.categoryId, filters.categoryIds));
+    }
+
+    if (filters.publisherId !== undefined) {
+        conditions.push(eq(games.publisherId, filters.publisherId));
+    }
+
+    return conditions;
+}
+
+/**
+ * Returns games ordered by title, optionally narrowed by category and publisher.
+ *
+ * @param db - Drizzle database client used to query the games and relations.
+ * @param filters - Optional category and publisher filters. Categories match any
+ * selected category, while publisher matching is exact.
+ * @returns Fully mapped games matching the requested filters.
+ */
+export async function getAllGames(db: Database, filters: GameFilters = {}): Promise<Game[]> {
+    const query = baseGamesQuery(db);
+    const conditions = getFilterConditions(filters);
+    const rows = await (conditions.length > 0 ? query.where(and(...conditions)) : query).orderBy(asc(games.title));
     return rows.map(mapGame);
 }
 
-/** All game ids ordered by title. */
+/**
+ * Returns all game ids ordered by title for static route generation.
+ *
+ * @param db - Drizzle database client used to query game ids.
+ * @returns Game ids in deterministic title order.
+ */
 export async function getAllGameIds(db: Database): Promise<number[]> {
     const rows = await db.select({ id: games.id }).from(games).orderBy(asc(games.title));
     return rows.map((row) => row.id);
 }
 
-/** A single game by id, or null when it does not exist. */
+/**
+ * Finds one game by id and includes its related category and publisher.
+ *
+ * @param db - Drizzle database client used to query the game.
+ * @param id - Numeric game identifier.
+ * @returns The mapped game, or null when no game has the requested id.
+ */
 export async function getGameById(db: Database, id: number): Promise<Game | null> {
     const row = await baseGamesQuery(db).where(eq(games.id, id)).get();
     return row ? mapGame(row) : null;

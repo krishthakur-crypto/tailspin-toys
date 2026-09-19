@@ -1,6 +1,48 @@
 import { test, expect, type Response } from '@playwright/test';
 
 test.describe('Game Listing and Navigation', () => {
+  test('should filter games by category and publisher', async ({ page }) => {
+    await test.step('Navigate to the homepage', async () => {
+      await page.goto('/');
+      await expect(page.getByTestId('game-filters')).toBeVisible();
+    });
+
+    await test.step('Filter by category', async () => {
+      await page.getByLabel('Strategy').check();
+      await expect(page).toHaveURL(/category=1/);
+      await expect(page.locator('[data-testid="game-card"]:not([hidden])')).toHaveCount(4);
+      await expect(page.getByTestId('filter-results')).toHaveText('Showing 4 games');
+    });
+
+    await test.step('Narrow results by publisher', async () => {
+      await page.getByTestId('publisher-filter').selectOption({ label: 'CodeForge Studios' });
+      await expect(page).toHaveURL(/category=1&publisher=1/);
+      await expect(page.locator('[data-testid="game-card"]:not([hidden])')).toHaveCount(1);
+      await expect(page.locator('[data-testid="game-card"]:not([hidden])').first()).toContainText('DevOps Dominion');
+    });
+  });
+
+  test('should restore filters from URL and clear them', async ({ page }) => {
+    await page.goto('/?category=2&publisher=2');
+    const allCards = page.locator('[data-testid="game-card"]');
+    const initialCardCount = await allCards.count();
+
+    await expect(page.getByLabel('Puzzle')).toBeChecked();
+    await expect(page.getByTestId('publisher-filter')).toHaveValue('2');
+    await expect(page.locator('[data-testid="game-card"]:not([hidden])')).toHaveCount(1);
+
+    await page.getByTestId('clear-filters').click();
+    await expect(page).toHaveURL('/');
+    await expect(page.locator('[data-testid="game-card"]:not([hidden])')).toHaveCount(initialCardCount);
+  });
+
+  test('should show an empty state when filters have no matches', async ({ page }) => {
+    await page.goto('/?category=1&publisher=999');
+
+    await expect(page.getByTestId('filter-empty-state')).toBeVisible();
+    await expect(page.getByTestId('filter-results')).toHaveText('Showing 0 games');
+  });
+
   test('should display games with titles on index page', async ({ page }) => {
     await test.step('Navigate to homepage', async () => {
       await page.goto('/');
